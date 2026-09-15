@@ -267,13 +267,44 @@ Structure:
 
 ---
 
-## 🔍 XML Format Examples
+## 🔍 Date Conversion Details
 
-### Nokia Format
+### Global Date Mapping
 
-**Filename:** `PM202607311004+030048LNBTS_-_410.xml.gz`
+All systems use the **same global date mapping**:
 
-**XML Content:**
+```
+Oldest date in source (e.g., 2026-07-31) → Today (e.g., 2026-09-15)
+Oldest + 1 day (e.g., 2026-08-01)        → Today + 1 day (e.g., 2026-09-16)
+Oldest + 2 days (e.g., 2026-08-02)       → Today + 2 days (e.g., 2026-09-17)
+...
+```
+
+**Rule:** Files with date ≥ today are **skipped** (not converted).
+
+---
+
+### Nokia (MO4/MO5) Date Conversion
+
+#### Filename Conversion
+
+**Pattern:** `PM{YYYYMMDD}{HHMM+TZ}...xml.gz`
+
+| Component | Before | After | Notes |
+|-----------|--------|-------|-------|
+| Date | `20260731` | `20260915` | Mapped to today |
+| Time | `1004+0300` | `1004+0300` | **Unchanged** |
+| Full | `PM202607311004+0300...` | `PM202609151004+0300...` | Date replaced |
+
+**Example:**
+```
+Before: PM202607311004+030048LNBTS_-_410.xml.gz
+After:  PM202609151004+030048LNBTS_-_410.xml.gz
+```
+
+#### XML Content Conversion
+
+**Before:**
 ```xml
 <measCollec beginTime="202607311004+0300"/>
 <measData>
@@ -281,7 +312,7 @@ Structure:
 </measData>
 ```
 
-**After Conversion:**
+**After:**
 ```xml
 <measCollec beginTime="2026-09-15T10:04:00+03:00"/>
 <measData>
@@ -289,25 +320,95 @@ Structure:
 </measData>
 ```
 
-### Huawei Format
+**Conversion Rules:**
+1. **Filename:** Replace only the date portion (`YYYYMMDD`)
+2. **XML `beginTime`/`endTime`:** Convert format from `YYYYMMDDHHMM+TZ` to `YYYY-MM-DDTHH:MM:SS+TZ:00`
+3. **Time portion:** Preserved exactly (HH:MM:SS)
+4. **Timezone:** Preserved exactly (+03:00)
 
-**Filename:** `A20260731.1000+0300-1015+0300_NODE.xml.gz`
+**Format Transformation:**
+```
+Input:  202607311004+0300
+Output: 2026-09-15T10:04:00+03:00
+        ^^^^^^^^  ^^^^^^^  ^^^^^
+        date      time     timezone
+```
 
-**XML Content:**
+---
+
+### Huawei (HWI) Date Conversion
+
+#### Filename Conversion
+
+**Pattern:** `A{YYYYMMDD}.{HHMM+TZ}-{HHMM+TZ}_...xml.gz`
+
+| Component | Before | After | Notes |
+|-----------|--------|-------|-------|
+| Date | `20260731` | `20260915` | Mapped to today |
+| Time Range | `1000+0300-1015+0300` | `1000+0300-1015+0300` | **Unchanged** |
+| Full | `A20260731.1000+0300-1015+0300_...` | `A20260915.1000+0300-1015+0300_...` | Date replaced |
+
+**Example:**
+```
+Before: A20260731.1000+0300-1015+0300_2912SUVAL41.xml.gz
+After:  A20260915.1000+0300-1015+0300_2912SUVAL41.xml.gz
+```
+
+#### XML Content Conversion
+
+**Before:**
 ```xml
 <measCollec beginTime="2026-07-31T15:45:00+03:00"/>
+</fileHeader>
 <measData>
-    <granPeriod duration="PT900S" endTime="2026-07-31T16:00:00+03:00"/>
+    <managedElement userLabel="2912SUVAL41"/>
+    <measInfo measInfoId="1526726659">
+        <granPeriod duration="PT900S" endTime="2026-07-31T16:00:00+03:00"/>
+    </measInfo>
 </measData>
 ```
 
-**After Conversion:**
+**After:**
 ```xml
 <measCollec beginTime="2026-09-15T15:45:00+03:00"/>
+</fileHeader>
 <measData>
-    <granPeriod duration="PT900S" endTime="2026-09-15T16:00:00+03:00"/>
+    <managedElement userLabel="2912SUVAL41"/>
+    <measInfo measInfoId="1526726659">
+        <granPeriod duration="PT900S" endTime="2026-09-15T16:00:00+03:00"/>
+    </measInfo>
 </measData>
 ```
+
+**Conversion Rules:**
+1. **Filename:** Replace only the date portion (`YYYYMMDD`)
+2. **XML `beginTime`/`endTime`:** Replace only the date portion (`YYYY-MM-DD`)
+3. **Time portion:** Preserved exactly (`HH:MM:SS`)
+4. **Timezone:** Preserved exactly (`+03:00`)
+
+**Format Transformation:**
+```
+Input:  2026-07-31T15:45:00+03:00
+Output: 2026-09-15T15:45:00+03:00
+        ^^^^^^^^  ^^^^^^^^^^^^^^^
+        date      time+timezone (unchanged)
+```
+
+---
+
+### Conversion Summary
+
+| Vendor | Filename Date | XML Date Format | Time Preserved |
+|--------|---------------|-----------------|----------------|
+| Nokia | `YYYYMMDD` → `YYYYMMDD` | `YYYYMMDDHHMM+TZ` → `YYYY-MM-DDTHH:MM:SS+TZ:00` | ✅ Yes |
+| Huawei | `YYYYMMDD` → `YYYYMMDD` | `YYYY-MM-DD` → `YYYY-MM-DD` | ✅ Yes |
+
+**Key Points:**
+- ✅ Dates are mapped globally (oldest → today)
+- ✅ Times are preserved exactly
+- ✅ Timezones are preserved exactly
+- ✅ Files with date ≥ today are skipped
+- ✅ Corrupted files moved to `/home/roundabout2/corrupted/{system}/`
 
 ---
 
