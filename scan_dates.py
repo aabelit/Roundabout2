@@ -180,6 +180,11 @@ def convert_mo_files(config, logger, system_key):
             if src_date not in date_map:
                 continue
             
+            # Skip files with date >= today
+            if src_date >= today:
+                logger.debug(f"  Skipping file with date >= today: {filename} ({src_date} >= {today})")
+                continue
+            
             target_date = date_map[src_date]
             target_date_str = target_date.strftime("%Y%m%d")
             
@@ -238,8 +243,17 @@ def convert_mo_files(config, logger, system_key):
             except Exception as e:
                 error_msg = str(e)
                 if "Compressed file ended" in error_msg or "corrupted" in error_msg.lower():
-                    logger.warning(f"  Skipping corrupted file: {filename} - {error_msg}")
-                    stats["skipped"] += 1
+                    # Move corrupted file to corrupted directory
+                    corrupted_dir = os.path.join("/home/roundabout2/corrupted", system_key)
+                    os.makedirs(corrupted_dir, exist_ok=True)
+                    corrupted_path = os.path.join(corrupted_dir, filename)
+                    try:
+                        import shutil
+                        shutil.move(source_path, corrupted_path)
+                        logger.warning(f"  Moved corrupted file: {filename} -> {corrupted_path}")
+                        stats["skipped"] += 1
+                    except Exception as move_err:
+                        logger.error(f"  Failed to move corrupted file {filename}: {move_err}")
                 else:
                     stats["errors"] += 1
                     logger.error(f"  Error processing {filename}: {e}")
@@ -288,6 +302,11 @@ def convert_hwi_files(config, logger):
                 continue
             
             if src_date not in date_map:
+                continue
+            
+            # Skip files with date >= today
+            if src_date >= today:
+                logger.debug(f"  Skipping file with date >= today: {filename} ({src_date} >= {today})")
                 continue
             
             target_date = date_map[src_date]
@@ -345,8 +364,17 @@ def convert_hwi_files(config, logger):
             except Exception as e:
                 error_msg = str(e)
                 if "Compressed file ended" in error_msg or "corrupted" in error_msg.lower():
-                    logger.warning(f"  Skipping corrupted file: {filename} - {error_msg}")
-                    stats["skipped"] += 1
+                    # Move corrupted file to corrupted directory
+                    corrupted_dir = "/home/roundabout2/corrupted/HWI"
+                    os.makedirs(corrupted_dir, exist_ok=True)
+                    corrupted_path = os.path.join(corrupted_dir, filename)
+                    try:
+                        import shutil
+                        shutil.move(source_path, corrupted_path)
+                        logger.warning(f"  Moved corrupted file: {filename} -> {corrupted_path}")
+                        stats["skipped"] += 1
+                    except Exception as move_err:
+                        logger.error(f"  Failed to move corrupted file {filename}: {move_err}")
                 else:
                     stats["errors"] += 1
                     logger.error(f"  Error processing {filename}: {e}")
