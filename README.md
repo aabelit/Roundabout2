@@ -96,7 +96,8 @@ Edit `config.json`:
     "stage2": {
         "interval_minutes": 15,
         "dest_base_dir": "/home/roundabout/dest",
-        "date_offset_days": 4
+        "date_offset_days": 4,
+        "time_to_cleanup": 2
     }
 }
 ```
@@ -130,6 +131,7 @@ find /home/roundabout/source -name "*.gz" | wc -l
 | `stage2.interval_minutes` | int | How often Stage 2 runs (default: 15) |
 | `stage2.dest_base_dir` | string | Base directory for copied files |
 | `stage2.date_offset_days` | int | Days to add to current date (default: 4) |
+| `stage2.time_to_cleanup` | int | Hours to keep files in dest (default: 2) |
 
 ### File Pattern
 
@@ -256,9 +258,10 @@ Initial synchronisation done
    - **Copies** file to destination directory (unchanged)
    - **Modifies** original in source (changes date to current date + N days)
 3. Destinations are separate per system (`dest/hwi/`, `dest/mo4/`, `dest/mo5/`)
-4. Runs in a loop until stopped
+4. **Cleans up** old files from dest directories (keeps only last N hours)
+5. Runs in a loop until stopped
 
-**Example (current time: 2026-09-16 14:00, offset: 4 days):**
+**Example (current time: 2026-09-16 14:00, offset: 4 days, keep: 2 hours):**
 ```
 File: A20260915.1000+0300-1015+0300_NODE.xml.gz
 Datetime in filename: 2026-09-15 10:00 (in the past)
@@ -268,6 +271,7 @@ Actions:
   2. Modify original:
      Filename: A20260919.1000+0300-1015+0300_NODE.xml.gz  (date → 2026-09-19)
      XML: beginTime="2026-09-19T10:00:00+03:00"
+  3. Cleanup: Remove files from dest older than 2 hours (based on filename datetime)
 ```
 
 ---
@@ -332,8 +336,11 @@ Processing hwu/HWI...
   HWI Progress: 100/500
   ...
   HWI Complete: 498 processed, 2 errors, 0 corrupted
-...
-STAGE 2 RUN COMPLETE - 1500 files processed, 6 errors
+
+Cleaning up dest directories (keeping last 2 hours)...
+  hwi: removed 150 old files
+
+STAGE 2 RUN COMPLETE - 1500 processed, 6 errors, 150 cleaned
 ============================================================
 ```
 
@@ -348,6 +355,7 @@ STAGE 2 RUN COMPLETE - 1500 files processed, 6 errors
 - Corrupted file warnings
 - Final statistics
 - Stage 2 run logs
+- Cleanup statistics
 
 ### Corrupted Files
 
@@ -662,9 +670,10 @@ The script processes ~2500-3000 files/min on HDD. For faster processing:
 ## 📝 Version History
 
 | Version | Date | Changes |
-|---------|------|---------|
+|---------|------|---------|  
 | 1.0.0 | 2026-09-15 | Initial release |
 | 2.0.0 | 2026-09-16 | Added Stage 1 (initial sync) and Stage 2 (periodic processing) |
+| 2.1.0 | 2026-09-16 | Added dest directory cleanup (time_to_cleanup) |
 
 ---
 
