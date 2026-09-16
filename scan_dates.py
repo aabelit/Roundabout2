@@ -4,7 +4,7 @@ Stage 1: One-time initial synchronization - shifts historical files so oldest = 
 Stage 2: Periodic processing - copies past files to dest, processes originals with date+4
 """
 
-import os, re, json, gzip, logging, shutil, time, datetime
+import os, re, json, gzip, logging, logging.handlers, shutil, time, datetime
 from pathlib import Path
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -22,7 +22,10 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.handlers = []
-    fh = logging.FileHandler(LOG_FILE, mode='w')
+    # Log rotation: max 10MB, keep 5 backup files
+    fh = logging.handlers.RotatingFileHandler(
+        LOG_FILE, maxBytes=10*1024*1024, backupCount=5, mode='w'
+    )
     fh.setLevel(logging.INFO)
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
