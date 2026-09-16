@@ -4,46 +4,51 @@ Automated PM (Performance Management) file date converter for Nokia and Huawei n
 
 ## 📋 Overview
 
-This tool scans source directories for PM data files, extracts dates from filenames, and converts them by mapping the oldest date to today's date. Files are processed in chronological order with automatic handling of corrupted files.
+This tool scans source directories for PM data files, extracts dates from filenames, and converts them using a two-stage process:
+
+- **Stage 1 (Initial Synchronization):** One-time conversion that shifts historical files so the oldest date becomes today
+- **Stage 2 (Periodic Processing):** Runs every 15 minutes, copying past files to destination and processing originals with date+4
 
 ### Key Features
 
-- **Multi-vendor support** — Nokia (MO4, MO5) and Huawei
+- **Multi-vendor support** — Nokia (MO4, MO5) and Huawei (HWI)
+- **Two-stage processing** — Stage 1 (one-time) + Stage 2 (periodic)
 - **Automatic date mapping** — Oldest date → today, oldest+1 → today+1, etc.
-- **Date limitation** — Skips files with date ≥ today
 - **Corrupted file handling** — Automatically moves corrupted files to dedicated directory
 - **Progress logging** — Detailed logs with conversion statistics
-- **Config-driven** — Easy to configure new vendors and systems
+- **Config-driven** — Easy to configure vendors, systems, and Stage 2 parameters
 
 ---
 
 ## 🏗 Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              /home/roundabout/source/                │
-│                                                      │
-│  ┌──────────┐   ┌──────────┐   ┌─────────────┐     │
-│  │  HWI     │   │ Nokia    │   │ Nokia       │     │
-│  │ (Huawei) │   │ MO4      │   │ MO5         │     │
-│  └────┬─────┘   └────┬─────┘   └──────┬──────┘     │
-│       └───────────────┼────────────────┘             │
-│                       ▼                              │
-│            ┌──────────────────┐                       │
-│            │  scan_dates.py   │                       │
-│            │  - Scan dates    │                       │
-│            │  - Convert files │                       │
-│            └──────────────────┘                       │
-│                       │                              │
-│                       ▼                              │
-│            ┌──────────────────┐                       │
-│            │  /home/roundabout│                       │
-│            │  /source/        │                       │
-│            │  (converted)     │                       │
-│            └──────────────────┘                       │
-│                                                      │
-│  Corrupted files → /home/roundabout2/corrupted/      │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                   /home/roundabout/source/                           │
+│                                                                      │
+│  ┌──────────┐   ┌──────────┐   ┌─────────────┐                     │
+│  │  HWI     │   │ Nokia    │   │ Nokia       │                     │
+│  │ (Huawei) │   │ MO4      │   │ MO5         │                     │
+│  └────┬─────┘   └────┬─────┘   └──────┬──────┘                     │
+│       └───────────────┼────────────────┘                             │
+│                       ▼                                              │
+│            ┌──────────────────┐                                      │
+│            │   scan_dates.py  │                                      │
+│            │                  │                                      │
+│            │  Stage 1:        │  One-time initial sync               │
+│            │  Stage 2:        │  Periodic (every 15 min)             │
+│            └──────────────────┘                                      │
+│                       │                                              │
+│          ┌────────────┴────────────┐                                │
+│          ▼                         ▼                                │
+│  ┌──────────────────┐      ┌──────────────────┐                    │
+│  │ /home/roundabout │      │ /home/roundabout │                    │
+│  │ /source/         │      │ /dest/           │                    │
+│  │ (converted)      │      │ (copied past)    │                    │
+│  └──────────────────┘      └──────────────────┘                    │
+│                                                                      │
+│  Corrupted files → /home/roundabout2/corrupted/                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -54,7 +59,8 @@ This tool scans source directories for PM data files, extracts dates from filena
 
 - **OS:** Linux (RHEL/CentOS/Ubuntu)
 - **Python:** 3.8+
-- **Disk:** Sufficient space for source files
+- **Disk:** Sufficient space for source and destination files
+- **Recommended:** SSD storage for optimal performance
 
 ### Step 1: Clone the Repository
 
@@ -63,7 +69,7 @@ git clone https://github.com/aabelit/Roundabout2.git /home/roundabout2
 cd /home/roundabout2
 ```
 
-### Step 2: Configure Source Directories
+### Step 2: Configure Source Directories and Stage 2
 
 Edit `config.json`:
 
@@ -86,6 +92,11 @@ Edit `config.json`:
                 }
             }
         }
+    },
+    "stage2": {
+        "interval_minutes": 15,
+        "dest_base_dir": "/home/roundabout/dest",
+        "date_offset_days": 4
     }
 }
 ```
@@ -115,6 +126,10 @@ find /home/roundabout/source -name "*.gz" | wc -l
 | `vendors.{name}.systems` | object | Nested systems (optional) |
 | `vendors.{name}.systems.{sys}` | object | System configuration |
 | `vendors.{name}.systems.{sys}.source_dir` | string | System source directory |
+| `stage2` | object | Stage 2 configuration |
+| `stage2.interval_minutes` | int | How often Stage 2 runs (default: 15) |
+| `stage2.dest_base_dir` | string | Base directory for copied files |
+| `stage2.date_offset_days` | int | Days to add to current date (default: 4) |
 
 ### File Pattern
 
@@ -169,40 +184,176 @@ pkill -9 -f scan_dates.py
 
 ---
 
-## 📊 Output
+## 🔄 Two-Stage Processing
 
-### Console Output
+### Stage 1: Initial Synchronization
 
+**Runs once at startup.**
+
+**Purpose:** Shift all historical files so the oldest date becomes today's date.
+
+**Behavior:**
+1. Scans all source directories for `.gz` files
+2. Extracts dates from filenames using configured patterns
+3. Finds the **global oldest date** across ALL systems
+4. Maps: oldest → today, oldest+1 → today+1, oldest+2 → today+2, etc.
+5. Processes only files with dates **before today** (skips today and future)
+6. Converts files in-place (replaces original with converted version)
+7. Moves corrupted files to `/home/roundabout2/corrupted/{system}/`
+8. Prints **"Initial synchronisation done"** when complete
+
+**Date Mapping Example:**
 ```
+Global oldest: 2026-07-31 (Huawei)
+Today:         2026-09-16
+
+Mapping:
+  2026-07-31 → 2026-09-16 (offset: +0 days)
+  2026-08-01 → 2026-09-17 (offset: +1 days)
+  2026-08-02 → 2026-09-18 (offset: +2 days)
+  2026-08-03 → 2026-09-19 (offset: +3 days)
+
+Skipped: Files with date ≥ 2026-09-16 (already today or later)
+```
+
+**Output:**
+```
+STAGE 1: Initial Synchronization
+============================================================
+  huawei: 1735864 files, oldest=2026-07-31, newest=2026-08-03
+  nokia/MO4: 425552 files, oldest=2026-09-16, newest=2026-12-19
+  nokia/MO5: 420673 files, oldest=2026-09-16, newest=2026-11-01
+
 start_date=2026-07-31
 end_date=2026-08-03
 
-Global oldest date: 2026-07-31
-Today's date: 2026-09-15
-Date range: 4 days
+Date range to process: 2026-07-31 to 2026-08-03
+Today: 2026-09-16
+Files in range: 4 unique dates
 
-  2026-07-31 -> 2026-09-15 (offset: +0 days)
-  2026-08-01 -> 2026-09-16 (offset: +1 days)
-  2026-08-02 -> 2026-09-17 (offset: +2 days)
-  2026-08-03 -> 2026-09-18 (offset: +3 days)
+  2026-07-31 -> 2026-09-16 (offset: +0 days)
+  2026-08-01 -> 2026-09-17 (offset: +1 days)
+  2026-08-02 -> 2026-09-18 (offset: +2 days)
+  2026-08-03 -> 2026-09-19 (offset: +3 days)
+
+Starting MO4 conversion...
+  Found 0 files to process  (all dates >= today, skipped)
+...
+Initial synchronisation done
+```
+
+---
+
+### Stage 2: Periodic Processing
+
+**Runs every N minutes (configurable).**
+
+**Purpose:** Copy past files to destination and process originals with date+4.
+
+**Behavior:**
+1. Checks full datetime (date + time) from filename against current time
+2. For files where datetime is **already in the past**:
+   - **Copies** file to destination directory (unchanged)
+   - **Modifies** original in source (changes date to current date + N days)
+3. Destinations are separate per system (`dest/hwi/`, `dest/mo4/`, `dest/mo5/`)
+4. Runs in a loop until stopped
+
+**Example (current time: 2026-09-16 14:00, offset: 4 days):**
+```
+File: A20260915.1000+0300-1015+0300_NODE.xml.gz
+Datetime in filename: 2026-09-15 10:00 (in the past)
+
+Actions:
+  1. Copy to: /home/roundabout/dest/hwi/A20260915.1000+0300-1015+0300_NODE.xml.gz
+  2. Modify original:
+     Filename: A20260919.1000+0300-1015+0300_NODE.xml.gz  (date → 2026-09-19)
+     XML: beginTime="2026-09-19T10:00:00+03:00"
+```
+
+---
+
+## 📊 Output
+
+### Console Output (Stage 1)
+
+```
+STAGE 1: Initial Synchronization
+============================================================
+  huawei: 1735864 files, oldest=2026-07-31, newest=2026-08-03
+  nokia/MO4: 425552 files, oldest=2026-09-16, newest=2026-12-19
+  nokia/MO5: 420673 files, oldest=2026-09-16, newest=2026-11-01
+
+start_date=2026-07-31
+end_date=2026-08-03
+
+Date range to process: 2026-07-31 to 2026-08-03
+Today: 2026-09-16
+Files in range: 4 unique dates
+============================================================
+
+  2026-07-31 -> 2026-09-16 (offset: +0 days)
+  2026-08-01 -> 2026-09-17 (offset: +1 days)
+  2026-08-02 -> 2026-09-18 (offset: +2 days)
+  2026-08-03 -> 2026-09-19 (offset: +3 days)
+
+Starting MO4 conversion...
+  Found 0 files to process
+  MO4 CONVERSION COMPLETE
+  Total: 0, Converted: 0, Skipped: 0, Errors: 0
+
+Starting MO5 conversion...
+  Found 0 files to process
+  MO5 CONVERSION COMPLETE
+  Total: 0, Converted: 0, Skipped: 0, Errors: 0
+
+Starting HWI conversion...
+  Found 1730090 files to process
+  HWI Progress: 1000/1730090
+  HWI Progress: 2000/1730090
+  ...
+  HWI CONVERSION COMPLETE
+  Total: 1730090, Converted: 1725000, Skipped: 5000, Errors: 90
+
+============================================================
+ALL STAGE 1 CONVERSIONS COMPLETE
+============================================================
+Initial synchronisation done
+
+Stage 2 will run every 15 minutes
+Press Ctrl+C to stop
+
+STAGE 2 RUN - 2026-09-16 14:15:00
+============================================================
+Processing hwu/HWI...
+  Source: /home/roundabout/source/HWI
+  Dest: /home/roundabout/dest/hwi
+  Target date: 2026-09-20
+  Found 500 files to process
+  HWI Progress: 100/500
+  ...
+  HWI Complete: 498 processed, 2 errors, 0 corrupted
+...
+STAGE 2 RUN COMPLETE - 1500 files processed, 6 errors
+============================================================
 ```
 
 ### Log File
 
-Location: `/home/roundabout2/logs/conversion.log`
+**Location:** `/home/roundabout2/logs/conversion.log`
 
-Contains:
+**Contains:**
 - Date scanning results
 - Date mapping
 - Conversion progress
 - Corrupted file warnings
 - Final statistics
+- Stage 2 run logs
 
 ### Corrupted Files
 
-Location: `/home/roundabout2/corrupted/{system_name}/`
+**Location:** `/home/roundabout2/corrupted/{system_name}/`
 
-Structure:
+**Structure:**
 ```
 /home/roundabout2/corrupted/
 ├── nokia/
@@ -214,36 +365,6 @@ Structure:
 └── HWI/
     └── ...
 ```
-
----
-
-## 🔄 Processing Flow
-
-### 1. Date Scanning
-- Scan all source directories
-- Extract dates from filenames using configured patterns
-- Find global oldest and newest dates
-
-### 2. Date Mapping
-- Map oldest date → today
-- Map oldest+1 → today+1
-- Continue for all dates in range
-- Skip files with date ≥ today
-
-### 3. File Conversion
-- For each system (MO4, MO5, HWI):
-  - Read gzipped XML file
-  - Replace dates in filename
-  - Replace dates in XML content
-  - Write converted file
-  - Remove original file
-  - Move corrupted files to `/home/roundabout2/corrupted/`
-
-### 4. Statistics
-- Total files processed
-- Files converted
-- Files skipped (corrupted)
-- Files with errors
 
 ---
 
@@ -263,20 +384,25 @@ Structure:
 │   │   └── MO5/
 │   └── HWI/
 └── create_config.py        # Config generator (optional)
+
+/home/roundabout/dest/      # Stage 2 destination (created automatically)
+├── hwi/                    # Huawei copied files
+├── mo4/                    # Nokia MO4 copied files
+└── mo5/                    # Nokia MO5 copied files
 ```
 
 ---
 
 ## 🔍 Date Conversion Details
 
-### Global Date Mapping
+### Global Date Mapping (Stage 1)
 
 All systems use the **same global date mapping**:
 
 ```
-Oldest date in source (e.g., 2026-07-31) → Today (e.g., 2026-09-15)
-Oldest + 1 day (e.g., 2026-08-01)        → Today + 1 day (e.g., 2026-09-16)
-Oldest + 2 days (e.g., 2026-08-02)       → Today + 2 days (e.g., 2026-09-17)
+Oldest date in source (e.g., 2026-07-31) → Today (e.g., 2026-09-16)
+Oldest + 1 day (e.g., 2026-08-01)        → Today + 1 day (e.g., 2026-09-17)
+Oldest + 2 days (e.g., 2026-08-02)       → Today + 2 days (e.g., 2026-09-18)
 ...
 ```
 
@@ -292,14 +418,14 @@ Oldest + 2 days (e.g., 2026-08-02)       → Today + 2 days (e.g., 2026-09-17)
 
 | Component | Before | After | Notes |
 |-----------|--------|-------|-------|
-| Date | `20260731` | `20260915` | Mapped to today |
+| Date | `20260731` | `20260916` | Mapped to today |
 | Time | `1004+0300` | `1004+0300` | **Unchanged** |
-| Full | `PM202607311004+0300...` | `PM202609151004+0300...` | Date replaced |
+| Full | `PM202607311004+0300...` | `PM202609161004+0300...` | Date replaced |
 
 **Example:**
 ```
 Before: PM202607311004+030048LNBTS_-_410.xml.gz
-After:  PM202609151004+030048LNBTS_-_410.xml.gz
+After:  PM202609161004+030048LNBTS_-_410.xml.gz
 ```
 
 #### XML Content Conversion
@@ -314,9 +440,9 @@ After:  PM202609151004+030048LNBTS_-_410.xml.gz
 
 **After:**
 ```xml
-<measCollec beginTime="2026-09-15T10:04:00+03:00"/>
+<measCollec beginTime="2026-09-16T10:04:00+03:00"/>
 <measData>
-    <granPeriod duration="PT900S" endTime="2026-09-15T10:19:00+03:00"/>
+    <granPeriod duration="PT900S" endTime="2026-09-16T10:19:00+03:00"/>
 </measData>
 ```
 
@@ -329,7 +455,7 @@ After:  PM202609151004+030048LNBTS_-_410.xml.gz
 **Format Transformation:**
 ```
 Input:  202607311004+0300
-Output: 2026-09-15T10:04:00+03:00
+Output: 2026-09-16T10:04:00+03:00
         ^^^^^^^^  ^^^^^^^  ^^^^^
         date      time     timezone
 ```
@@ -344,14 +470,14 @@ Output: 2026-09-15T10:04:00+03:00
 
 | Component | Before | After | Notes |
 |-----------|--------|-------|-------|
-| Date | `20260731` | `20260915` | Mapped to today |
+| Date | `20260731` | `20260916` | Mapped to today |
 | Time Range | `1000+0300-1015+0300` | `1000+0300-1015+0300` | **Unchanged** |
-| Full | `A20260731.1000+0300-1015+0300_...` | `A20260915.1000+0300-1015+0300_...` | Date replaced |
+| Full | `A20260731.1000+0300-1015+0300_...` | `A20260916.1000+0300-1015+0300_...` | Date replaced |
 
 **Example:**
 ```
 Before: A20260731.1000+0300-1015+0300_2912SUVAL41.xml.gz
-After:  A20260915.1000+0300-1015+0300_2912SUVAL41.xml.gz
+After:  A20260916.1000+0300-1015+0300_2912SUVAL41.xml.gz
 ```
 
 #### XML Content Conversion
@@ -370,12 +496,12 @@ After:  A20260915.1000+0300-1015+0300_2912SUVAL41.xml.gz
 
 **After:**
 ```xml
-<measCollec beginTime="2026-09-15T15:45:00+03:00"/>
+<measCollec beginTime="2026-09-16T15:45:00+03:00"/>
 </fileHeader>
 <measData>
     <managedElement userLabel="2912SUVAL41"/>
     <measInfo measInfoId="1526726659">
-        <granPeriod duration="PT900S" endTime="2026-09-15T16:00:00+03:00"/>
+        <granPeriod duration="PT900S" endTime="2026-09-16T16:00:00+03:00"/>
     </measInfo>
 </measData>
 ```
@@ -389,7 +515,7 @@ After:  A20260915.1000+0300-1015+0300_2912SUVAL41.xml.gz
 **Format Transformation:**
 ```
 Input:  2026-07-31T15:45:00+03:00
-Output: 2026-09-15T15:45:00+03:00
+Output: 2026-09-16T15:45:00+03:00
         ^^^^^^^^  ^^^^^^^^^^^^^^^
         date      time+timezone (unchanged)
 ```
@@ -407,8 +533,87 @@ Output: 2026-09-15T15:45:00+03:00
 - ✅ Dates are mapped globally (oldest → today)
 - ✅ Times are preserved exactly
 - ✅ Timezones are preserved exactly
-- ✅ Files with date ≥ today are skipped
+- ✅ Files with date ≥ today are skipped (Stage 1)
+- ✅ Full datetime checked against current time (Stage 2)
 - ✅ Corrupted files moved to `/home/roundabout2/corrupted/{system}/`
+
+---
+
+## 📋 Function Reference
+
+### `setup_logging()`
+Sets up file and console logging.
+- Creates log directory if needed
+- Configures file handler (`/home/roundabout2/logs/conversion.log`)
+- Configures console handler
+- Returns logger instance
+
+### `load_config()`
+Loads configuration from `config.json`.
+- Returns parsed JSON as dictionary
+
+### `extract_date_from_filename(filename, pattern)`
+Extracts date string from filename using regex pattern.
+- **Parameters:**
+  - `filename` (str): Filename to parse
+  - `pattern` (CompiledRegex): Compiled regex pattern
+- **Returns:** Date string (YYYYMMDD) or None
+
+### `scan_source_files(config, logger)`
+Scans all source directories and extracts dates from filenames.
+- **Parameters:**
+  - `config` (dict): Configuration dictionary
+  - `logger` (Logger): Logger instance
+- **Returns:** Tuple of (vendor_dates, all_dates)
+  - `vendor_dates`: Dict of {system_key: {dates, file_count, oldest_date, newest_date}}
+  - `all_dates`: List of all dates found across all systems
+
+### `stage1_conversion(config, logger)`
+**Stage 1:** One-time initial synchronization.
+- Scans all source directories
+- Finds global oldest date
+- Maps oldest → today, oldest+1 → today+1, etc.
+- Processes only files with dates before today
+- Converts files in-place
+- Moves corrupted files to `/home/roundabout2/corrupted/`
+- Prints "Initial synchronisation done" when complete
+
+### `convert_mo_files(config, logger, system_key, today, date_range_end, corrupted_dir, max_workers)`
+Converts Nokia MO files (MO4/MO5).
+- **Parameters:**
+  - `config` (dict): Configuration dictionary
+  - `logger` (Logger): Logger instance
+  - `system_key` (str): System key (e.g., "nokia/MO4")
+  - `today` (date): Today's date
+  - `date_range_end` (date): End of date range to process
+  - `corrupted_dir` (str): Directory for corrupted files
+  - `max_workers` (int): Number of parallel workers (default: 4)
+- Uses ThreadPoolExecutor for parallel processing
+- Handles corrupted files automatically
+
+### `convert_hwi_files(config, logger, today, date_range_end, corrupted_dir, max_workers)`
+Converts Huawei HWI files.
+- **Parameters:** Same as `convert_mo_files`
+- Uses ThreadPoolExecutor for parallel processing
+- Handles corrupted files automatically
+
+### `stage2_run(config, logger)`
+**Stage 2:** Periodic processing.
+- Checks full datetime (date + time) from filename
+- Copies past files to destination directory
+- Modifies originals with date+4
+- **Parameters:**
+  - `config` (dict): Configuration dictionary (must include `stage2` section)
+  - `logger` (Logger): Logger instance
+- Destinations: `{dest_base_dir}/{system}/` (e.g., `/home/roundabout/dest/hwi/`)
+
+### `main()`
+Main entry point.
+1. Sets up logging
+2. Loads configuration
+3. Runs Stage 1 (one-time)
+4. Enters Stage 2 loop (every N minutes)
+5. Ctrl+C to stop
 
 ---
 
@@ -445,6 +650,13 @@ chmod -R 755 /home/roundabout2/
 chown -R root:root /home/roundabout2/
 ```
 
+### Performance Issues
+
+The script processes ~2500-3000 files/min on HDD. For faster processing:
+- **Move source files to SSD** (10-30x speedup)
+- **Increase workers** (not recommended, diminishing returns)
+- **Use zstd compression** (requires format change)
+
 ---
 
 ## 📝 Version History
@@ -452,6 +664,7 @@ chown -R root:root /home/roundabout2/
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-09-15 | Initial release |
+| 2.0.0 | 2026-09-16 | Added Stage 1 (initial sync) and Stage 2 (periodic processing) |
 
 ---
 

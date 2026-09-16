@@ -16,5 +16,10 @@
                 }
             }
         }
+    },
+    "stage2": {
+        "interval_minutes": 15,
+        "dest_base_dir": "/home/roundabout/dest",
+        "date_offset_days": 4
     }
 }
