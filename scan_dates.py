@@ -477,13 +477,45 @@ def _stage2_process_hwi_file(sp, nf, tds, tp, dest_dir):
         return (False, fn, f'error: {e}')
 
 
+def _cleanup_dest_dir(dest_dir, pattern, keep_hours, logger):
+    """Clean up destination directory - keep only files from last N hours.
+    Files are identified by date in filename.
+    """
+    cutoff = datetime.datetime.now() - datetime.timedelta(hours=keep_hours)
+    to_delete = []
+
+    if not os.path.exists(dest_dir):
+        return 0
+
+    for fn in os.listdir(dest_dir):
+        if not fn.endswith(".gz"):
+            continue
+        dt = extract_datetime_from_filename(fn, "unknown", pattern)
+        if dt is None:
+            continue
+        if dt < cutoff:
+            to_delete.append(os.path.join(dest_dir, fn))
+
+    deleted = 0
+    for fpath in to_delete:
+        try:
+            os.remove(fpath)
+            deleted += 1
+        except Exception:
+            pass
+
+    return deleted
+
+
 def stage2_run(config, logger):
     """Stage 2: Periodic processing.
     Copies past files to dest, processes originals with date+4.
+    Cleans up old files from dest directory.
     """
     stage2_cfg = config.get("stage2", {})
     dest_base = stage2_cfg.get("dest_base_dir", "/home/roundabout/dest")
     date_offset = stage2_cfg.get("date_offset_days", 4)
+    keep_hours = stage2_cfg.get("time_to_cleanup", 2)  # Hours to keep files
 
     logger.info("=" * 60)
     logger.info(f"STAGE 2 RUN - {datetime.datetime.now()}")
@@ -582,8 +614,19 @@ def stage2_run(config, logger):
         logger.info(f"  {sname} Complete: {stats['processed']} processed, "
                     f"{stats['errors']} errors, {stats['corrupted']} corrupted")
 
+    # Cleanup: remove files older than keep_hours from dest directories
+    logger.info(f"\nCleaning up dest directories (keeping last {keep_hours} hours)...")
+    total_cleaned = 0
+    for sys_info in systems:
+        stype = sys_info["system_type"]
+        dest_dir = os.path.join(dest_base, stype)
+        cleaned = _cleanup_dest_dir(dest_dir, sys_info["pattern"], keep_hours, logger)
+        total_cleaned += cleaned
+        if cleaned > 0:
+            logger.info(f"  {stype}: removed {cleaned} old files")
+
     logger.info("=" * 60)
-    logger.info(f"STAGE 2 RUN COMPLETE - {total_processed} files processed, {total_errors} errors")
+    logger.info(f"STAGE 2 RUN COMPLETE - {total_processed} processed, {total_errors} errors, {total_cleaned} cleaned")
     logger.info("=" * 60)
 
 
