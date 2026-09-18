@@ -1,26 +1,28 @@
-# PM File Analyzer - Roundabout2
+# Анализатор PM-файлов — Roundabout2
 
-Automated PM (Performance Management) file date converter for Nokia and Huawei network equipment.
+Автоматизированный конвертер дат PM (Performance Management) файлов для оборудования Nokia и Huawei.
 
-## 📋 Overview
+## 📋 Обзор
 
-This tool scans source directories for PM data files, extracts dates from filenames, and converts them using a two-stage process:
+Инструмент сканирует исходные директории на наличие PM-файлов данных, извлекает даты из имён файлов и преобразует их с помощью двухэтапного процесса:
 
-- **Stage 1 (Initial Synchronization):** One-time conversion that shifts historical files so the oldest date becomes today
-- **Stage 2 (Periodic Processing):** Runs every 15 minutes, copying past files to destination and processing originals with date+4
+- **Этап 1 (Начальная синхронизация):** Однократное преобразование, которое сдвигает исторические файлы так, что самая старая дата становится сегодняшней
+- **Этап 2 (Периодическая обработка):** Запускается каждые 15 минут, копирует прошедшие файлы в пункт назначения и обрабатывает оригиналы с датой+4
 
-### Key Features
+### Ключевые возможности
 
-- **Multi-vendor support** — Nokia (MO4, MO5) and Huawei (HWI)
-- **Two-stage processing** — Stage 1 (one-time) + Stage 2 (periodic)
-- **Automatic date mapping** — Oldest date → today, oldest+1 → today+1, etc.
-- **Corrupted file handling** — Automatically moves corrupted files to dedicated directory
-- **Progress logging** — Detailed logs with conversion statistics
-- **Config-driven** — Easy to configure vendors, systems, and Stage 2 parameters
+- **Поддержка нескольких вендоров** — Nokia (MO4, MO5) и Huawei (HWI)
+- **Двухэтапная обработка** — Этап 1 (однократный) + Этап 2 (периодический)
+- **Пропуск Этапа 1** — Опция `skip_stage1` для запуска только Этапа 2
+- **Автоматическое сопоставление дат** — Самая старая дата → сегодня, oldest+1 → сегодня+1 и т.д.
+- **Обработка повреждённых файлов** — Автоматически перемещает повреждённые файлы в отдельную директорию
+- **Периодическая очистка** — Удаление старых файлов из dest во время обработки (каждые 5000 файлов)
+- **Журналирование прогресса** — Подробные логи со статистикой преобразований
+- **Конфигурация через файл** — Легко настраивается вендоры, системы и параметры Этапа 2
 
 ---
 
-## 🏗 Architecture
+## 🏗 Архитектура
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -35,8 +37,8 @@ This tool scans source directories for PM data files, extracts dates from filena
 │            ┌──────────────────┐                                      │
 │            │   scan_dates.py  │                                      │
 │            │                  │                                      │
-│            │  Stage 1:        │  One-time initial sync               │
-│            │  Stage 2:        │  Periodic (every 15 min)             │
+│            │  Этап 1:         │  Однократная начальная синхронизация  │
+│            │  Этап 2:         │  Периодическая (каждые 15 мин)       │
 │            └──────────────────┘                                      │
 │                       │                                              │
 │          ┌────────────┴────────────┐                                │
@@ -44,34 +46,34 @@ This tool scans source directories for PM data files, extracts dates from filena
 │  ┌──────────────────┐      ┌──────────────────┐                    │
 │  │ /home/roundabout │      │ /home/roundabout │                    │
 │  │ /source/         │      │ /dest/           │                    │
-│  │ (converted)      │      │ (copied past)    │                    │
+│  │ (преобразованные) │      │ (скопированные)  │                    │
 │  └──────────────────┘      └──────────────────┘                    │
 │                                                                      │
-│  Corrupted files → /home/roundabout2/corrupted/                     │
+│  Повреждённые файлы → /home/roundabout2/corrupted/                  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Installation
+## 📦 Установка
 
-### Prerequisites
+### Требования
 
-- **OS:** Linux (RHEL/CentOS/Ubuntu)
+- **ОС:** Linux (RHEL/CentOS/Ubuntu)
 - **Python:** 3.8+
-- **Disk:** Sufficient space for source and destination files
-- **Recommended:** SSD storage for optimal performance
+- **Диск:** Достаточное пространство для исходных и целевых файлов
+- **Рекомендуется:** SSD-накопитель для оптимальной производительности
 
-### Step 1: Clone the Repository
+### Шаг 1: Клонирование репозитория
 
 ```bash
 git clone https://github.com/aabelit/Roundabout2.git /home/roundabout2
 cd /home/roundabout2
 ```
 
-### Step 2: Configure Source Directories and Stage 2
+### Шаг 2: Настройка исходных директорий и Этапа 2
 
-Edit `config.json`:
+Отредактируйте `config.json`:
 
 ```json
 {
@@ -102,83 +104,83 @@ Edit `config.json`:
 }
 ```
 
-### Step 3: Verify Source Files
+### Шаг 3: Проверка исходных файлов
 
 ```bash
-# Check source directories exist
+# Проверка существования исходных директорий
 ls -la /home/roundabout/source/
 
-# Count files
+# Подсчёт файлов
 find /home/roundabout/source -name "*.gz" | wc -l
 ```
 
 ---
 
-## ⚙️ Configuration
+## ⚙️ Конфигурация
 
-### config.json Structure
+### Структура config.json
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `vendors` | object | Vendor configurations |
-| `vendors.{name}` | object | Individual vendor config |
-| `vendors.{name}.source_dir` | string | Source directory path |
-| `vendors.{name}.file_pattern` | string | Regex pattern to extract dates |
-| `vendors.{name}.systems` | object | Nested systems (optional) |
-| `vendors.{name}.systems.{sys}` | object | System configuration |
-| `vendors.{name}.systems.{sys}.source_dir` | string | System source directory |
-| `stage2` | object | Stage 2 configuration |
-| `stage2.interval_minutes` | int | How often Stage 2 runs (default: 15) |
-| `stage2.dest_base_dir` | string | Base directory for copied files |
-| `stage2.date_offset_days` | int | Days to add to current date (default: 4) |
-| `stage2.time_to_cleanup` | int | Hours to keep files in dest (default: 2) |
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `vendors` | object | Конфигурации вендоров |
+| `vendors.{name}` | object | Конфигурация отдельного вендора |
+| `vendors.{name}.source_dir` | string | Путь к исходной директории |
+| `vendors.{name}.file_pattern` | string | Regex-шаблон для извлечения дат |
+| `vendors.{name}.systems` | object | Вложенные системы (необязательно) |
+| `vendors.{name}.systems.{sys}` | object | Конфигурация системы |
+| `vendors.{name}.systems.{sys}.source_dir` | string | Исходная директория системы |
+| `stage2` | object | Конфигурация Этапа 2 |
+| `stage2.interval_minutes` | int | Как часто запускается Этап 2 (по умолчанию: 15) |
+| `stage2.dest_base_dir` | string | Базовая директория для скопированных файлов |
+| `stage2.date_offset_days` | int | Дней к прибавить к текущей дате (по умолчанию: 4) |
+| `stage2.time_to_cleanup` | int | Часов хранить файлы в dest (по умолчанию: 2) |
 
-### File Pattern
+### Шаблон файла
 
-The `file_pattern` must have the date as the **first capture group** `(\d{8})`.
+`file_pattern` должен содержать дату как **первую захватывающую группу** `(\d{8})`.
 
-**Huawei example:**
+**Пример для Huawei:**
 ```
-Pattern: A(\d{8})\.(\d{4}\+\d{4})-(\d{4}\+\d{4})_.*\.xml\.gz
-File:    A20260731.1000+0300-1015+0300_NODE.xml.gz
-Date:    20260731
+Шаблон: A(\d{8})\.(\d{4}\+\d{4})-(\d{4}\+\d{4})_.*\.xml\.gz
+Файл:   A20260731.1000+0300-1015+0300_NODE.xml.gz
+Дата:   20260731
 ```
 
-**Nokia example:**
+**Пример для Nokia:**
 ```
-Pattern: PM(\d{8})(\d{4}\+\d{4}).*\.xml\.gz
-File:    PM202607311004+030048LNBTS_-_410.xml.gz
-Date:    20260731
+Шаблон: PM(\d{8})(\d{4}\+\d{4}).*\.xml\.gz
+Файл:   PM202607311004+030048LNBTS_-_410.xml.gz
+Дата:   20260731
 ```
 
 ---
 
-## 🚀 Usage
+## 🚀 Использование
 
-### Run Conversion
+### Запуск преобразования
 
 ```bash
 cd /home/roundabout2
 python3 scan_dates.py
 ```
 
-### Run in Background
+### Запуск в фоне
 
 ```bash
 nohup python3 scan_dates.py > /dev/null 2>&1 &
 ```
 
-### Check Progress
+### Проверка прогресса
 
 ```bash
-# View log file
+# Просмотр лог-файла
 tail -f /home/roundabout2/logs/conversion.log
 
-# View last 50 lines
+# Просмотр последних 50 строк
 tail -50 /home/roundabout2/logs/conversion.log
 ```
 
-### Stop Conversion
+### Остановка преобразования
 
 ```bash
 pkill -9 -f scan_dates.py
@@ -186,39 +188,39 @@ pkill -9 -f scan_dates.py
 
 ---
 
-## 🔄 Two-Stage Processing
+## 🔄 Двухэтапная обработка
 
-### Stage 1: Initial Synchronization
+### Этап 1: Начальная синхронизация
 
-**Runs once at startup.**
+**Запускается один раз при старте.**
 
-**Purpose:** Shift all historical files so the oldest date becomes today's date.
+**Назначение:** Сдвинуть все исторические файлы так, чтобы самая старая дата стала сегодняшней.
 
-**Behavior:**
-1. Scans all source directories for `.gz` files
-2. Extracts dates from filenames using configured patterns
-3. Finds the **global oldest date** across ALL systems
-4. Maps: oldest → today, oldest+1 → today+1, oldest+2 → today+2, etc.
-5. Processes only files with dates **before today** (skips today and future)
-6. Converts files in-place (replaces original with converted version)
-7. Moves corrupted files to `/home/roundabout2/corrupted/{system}/`
-8. Prints **"Initial synchronisation done"** when complete
+**Поведение:**
+1. Сканирует все исходные директории на наличие `.gz` файлов
+2. Извлекает даты из имён файлов с помощью настроенных шаблонов
+3. Находит **глобальную самую старую дату** по ВСЕМ системам
+4. Сопоставляет: самая старая → сегодня, oldest+1 → сегодня+1, oldest+2 → сегодня+2 и т.д.
+5. Обрабатывает только файлы с датами **ранее сегодняшней** (пропускает сегодня и будущие)
+6. Преобразует файлы на месте (заменяет оригинал преобразованной версией)
+7. Перемещает повреждённые файлы в `/home/roundabout2/corrupted/{system}/`
+8. Выводит **"Initial synchronisation done"** при завершении
 
-**Date Mapping Example:**
+**Пример сопоставления дат:**
 ```
-Global oldest: 2026-07-31 (Huawei)
-Today:         2026-09-16
+Глобальная самая старая: 2026-07-31 (Huawei)
+Сегодня:                 2026-09-16
 
-Mapping:
-  2026-07-31 → 2026-09-16 (offset: +0 days)
-  2026-08-01 → 2026-09-17 (offset: +1 days)
-  2026-08-02 → 2026-09-18 (offset: +2 days)
-  2026-08-03 → 2026-09-19 (offset: +3 days)
+Сопоставление:
+  2026-07-31 → 2026-09-16 (смещение: +0 дней)
+  2026-08-01 → 2026-09-17 (смещение: +1 дней)
+  2026-08-02 → 2026-09-18 (смещение: +2 дней)
+  2026-08-03 → 2026-09-19 (смещение: +3 дней)
 
-Skipped: Files with date ≥ 2026-09-16 (already today or later)
+Пропущены: Файлы с датой ≥ 2026-09-16 (уже сегодня или позже)
 ```
 
-**Output:**
+**Вывод:**
 ```
 STAGE 1: Initial Synchronization
 ============================================================
@@ -246,39 +248,39 @@ Initial synchronisation done
 
 ---
 
-### Stage 2: Periodic Processing
+### Этап 2: Периодическая обработка
 
-**Runs every N minutes (configurable).**
+**Запускается каждые N минут (настраивается).**
 
-**Purpose:** Copy past files to destination and process originals with date+4.
+**Назначение:** Копировать прошедшие файлы в пункт назначения и обрабатывать оригиналы с датой+4.
 
-**Behavior:**
-1. Checks full datetime (date + time) from filename against current time
-2. For files where datetime is **already in the past**:
-   - **Copies** file to destination directory (unchanged)
-   - **Modifies** original in source (changes date to current date + N days)
-3. Destinations are separate per system (`dest/hwi/`, `dest/mo4/`, `dest/mo5/`)
-4. **Cleans up** old files from dest directories (keeps only last N hours)
-5. Runs in a loop until stopped
+**Поведение:**
+1. Проверяет полное время (дата + время) из имени файла относительно текущего времени
+2. Для файлов, где время **уже в прошлом**:
+   - **Копирует** файл в директорию назначения (без изменений)
+   - **Модифицирует** оригинал в источнике (изменяет дату на текущую дату + N дней)
+3. Пункты назначения разделены по системам (`dest/hwi/`, `dest/mo4/`, `dest/mo5/`)
+4. **Очищает** старые файлы из директорий dest (хранит только последние N часов)
+5. Запускается в цикле до остановки
 
-**Example (current time: 2026-09-16 14:00, offset: 4 days, keep: 2 hours):**
+**Пример (текущее время: 2026-09-16 14:00, смещение: 4 дня, хранение: 2 часа):**
 ```
-File: A20260915.1000+0300-1015+0300_NODE.xml.gz
-Datetime in filename: 2026-09-15 10:00 (in the past)
+Файл: A20260915.1000+0300-1015+0300_NODE.xml.gz
+Время в имени файла: 2026-09-15 10:00 (в прошлом)
 
-Actions:
-  1. Copy to: /home/roundabout/dest/hwi/A20260915.1000+0300-1015+0300_NODE.xml.gz
-  2. Modify original:
-     Filename: A20260919.1000+0300-1015+0300_NODE.xml.gz  (date → 2026-09-19)
+Действия:
+  1. Копирование в: /home/roundabout/dest/hwi/A20260915.1000+0300-1015+0300_NODE.xml.gz
+  2. Модификация оригинала:
+     Имя файла: A20260919.1000+0300-1015+0300_NODE.xml.gz  (дата → 2026-09-19)
      XML: beginTime="2026-09-19T10:00:00+03:00"
-  3. Cleanup: Remove files from dest older than 2 hours (based on filename datetime)
+  3. Очистка: Удаление файлов из dest старше 2 часов (на основе времени в имени файла)
 ```
 
 ---
 
-## 📊 Output
+## 📊 Вывод
 
-### Console Output (Stage 1)
+### Вывод в консоль (Этап 1)
 
 ```
 STAGE 1: Initial Synchronization
@@ -344,24 +346,24 @@ STAGE 2 RUN COMPLETE - 1500 processed, 6 errors, 150 cleaned
 ============================================================
 ```
 
-### Log File
+### Лог-файл
 
-**Location:** `/home/roundabout2/logs/conversion.log`
+**Расположение:** `/home/roundabout2/logs/conversion.log`
 
-**Contains:**
-- Date scanning results
-- Date mapping
-- Conversion progress
-- Corrupted file warnings
-- Final statistics
-- Stage 2 run logs
-- Cleanup statistics
+**Содержит:**
+- Результаты сканирования дат
+- Сопоставление дат
+- Прогресс преобразования
+- Предупреждения о повреждённых файлах
+- Итоговая статистика
+- Логи запусков Этапа 2
+- Статистика очистки
 
-### Corrupted Files
+### Повреждённые файлы
 
-**Location:** `/home/roundabout2/corrupted/{system_name}/`
+**Расположение:** `/home/roundabout2/corrupted/{system_name}/`
 
-**Structure:**
+**Структура:**
 ```
 /home/roundabout2/corrupted/
 ├── nokia/
@@ -376,69 +378,70 @@ STAGE 2 RUN COMPLETE - 1500 processed, 6 errors, 150 cleaned
 
 ---
 
-## 📁 Directory Structure
+## 📁 Структура директорий
 
 ```
 /home/roundabout2/
-├── scan_dates.py           # Main conversion script
-├── config.json             # Configuration file
-├── README.md               # This file
-├── .gitignore              # Git ignore file
-├── logs/                   # Log files
+├── scan_dates.py           # Основной скрипт преобразования
+├── config.json             # Файл конфигурации
+├── README.md               # Этот файл
+├── README_ru.md            # Русская версия этого файла
+├── .gitignore              # Файл игнорирования Git
+├── logs/                   # Файлы логов
 │   └── conversion.log
-├── corrupted/              # Corrupted files
+├── corrupted/              # Повреждённые файлы
 │   ├── nokia/
 │   │   ├── MO4/
 │   │   └── MO5/
 │   └── HWI/
-└── create_config.py        # Config generator (optional)
+└── create_config.py        # Генератор конфигурации (необязательно)
 
-/home/roundabout/dest/      # Stage 2 destination (created automatically)
-├── hwi/                    # Huawei copied files
-├── mo4/                    # Nokia MO4 copied files
-└── mo5/                    # Nokia MO5 copied files
+/home/roundabout/dest/      # Пункт назначения Этапа 2 (создаётся автоматически)
+├── hwi/                    # Скопированные файлы Huawei
+├── mo4/                    # Скопированные файлы Nokia MO4
+└── mo5/                    # Скопированные файлы Nokia MO5
 ```
 
 ---
 
-## 🔍 Date Conversion Details
+## 🔍 Детали преобразования дат
 
-### Global Date Mapping (Stage 1)
+### Глобальное сопоставление дат (Этап 1)
 
-All systems use the **same global date mapping**:
+Все системы используют **одно и то же глобальное сопоставление дат**:
 
 ```
-Oldest date in source (e.g., 2026-07-31) → Today (e.g., 2026-09-16)
-Oldest + 1 day (e.g., 2026-08-01)        → Today + 1 day (e.g., 2026-09-17)
-Oldest + 2 days (e.g., 2026-08-02)       → Today + 2 days (e.g., 2026-09-18)
+Самая старая дата в источнике (например, 2026-07-31) → Сегодня (например, 2026-09-16)
+Старая + 1 день (например, 2026-08-01)              → Сегодня + 1 день (например, 2026-09-17)
+Старая + 2 дня (например, 2026-08-02)               → Сегодня + 2 дня (например, 2026-09-18)
 ...
 ```
 
-**Rule:** Files with date ≥ today are **skipped** (not converted).
+**Правило:** Файлы с датой ≥ сегодня **пропускаются** (не преобразуются).
 
 ---
 
-### Nokia (MO4/MO5) Date Conversion
+### Преобразование дат Nokia (MO4/MO5)
 
-#### Filename Conversion
+#### Преобразование имени файла
 
-**Pattern:** `PM{YYYYMMDD}{HHMM+TZ}...xml.gz`
+**Шаблон:** `PM{YYYYMMDD}{HHMM+TZ}...xml.gz`
 
-| Component | Before | After | Notes |
-|-----------|--------|-------|-------|
-| Date | `20260731` | `20260916` | Mapped to today |
-| Time | `1004+0300` | `1004+0300` | **Unchanged** |
-| Full | `PM202607311004+0300...` | `PM202609161004+0300...` | Date replaced |
+| Компонент | До | После | Примечания |
+|-----------|-----|-------|------------|
+| Дата | `20260731` | `20260916` | Сопоставляется с сегодня |
+| Время | `1004+0300` | `1004+0300` | **Не изменяется** |
+| Полное | `PM202607311004+0300...` | `PM202609161004+0300...` | Дата заменена |
 
-**Example:**
+**Пример:**
 ```
-Before: PM202607311004+030048LNBTS_-_410.xml.gz
-After:  PM202609161004+030048LNBTS_-_410.xml.gz
+До:  PM202607311004+030048LNBTS_-_410.xml.gz
+После: PM202609161004+030048LNBTS_-_410.xml.gz
 ```
 
-#### XML Content Conversion
+#### Преобразование содержимого XML
 
-**Before:**
+**До:**
 ```xml
 <measCollec beginTime="202607311004+0300"/>
 <measData>
@@ -446,7 +449,7 @@ After:  PM202609161004+030048LNBTS_-_410.xml.gz
 </measData>
 ```
 
-**After:**
+**После:**
 ```xml
 <measCollec beginTime="2026-09-16T10:04:00+03:00"/>
 <measData>
@@ -454,43 +457,43 @@ After:  PM202609161004+030048LNBTS_-_410.xml.gz
 </measData>
 ```
 
-**Conversion Rules:**
-1. **Filename:** Replace only the date portion (`YYYYMMDD`)
-2. **XML `beginTime`/`endTime`:** Convert format from `YYYYMMDDHHMM+TZ` to `YYYY-MM-DDTHH:MM:SS+TZ:00`
-3. **Time portion:** Preserved exactly (HH:MM:SS)
-4. **Timezone:** Preserved exactly (+03:00)
+**Правила преобразования:**
+1. **Имя файла:** Заменить только часть даты (`YYYYMMDD`)
+2. **XML `beginTime`/`endTime`:** Преобразовать формат с `YYYYMMDDHHMM+TZ` на `YYYY-MM-DDTHH:MM:SS+TZ:00`
+3. **Часть времени:** Сохраняется точно (HH:MM:SS)
+4. **Часовой пояс:** Сохраняется точно (+03:00)
 
-**Format Transformation:**
+**Трансформация формата:**
 ```
-Input:  202607311004+0300
-Output: 2026-09-16T10:04:00+03:00
+Вход:   202607311004+0300
+Выход:  2026-09-16T10:04:00+03:00
         ^^^^^^^^  ^^^^^^^  ^^^^^
-        date      time     timezone
+        дата      время     часовой пояс
 ```
 
 ---
 
-### Huawei (HWI) Date Conversion
+### Преобразование дат Huawei (HWI)
 
-#### Filename Conversion
+#### Преобразование имени файла
 
-**Pattern:** `A{YYYYMMDD}.{HHMM+TZ}-{HHMM+TZ}_...xml.gz`
+**Шаблон:** `A{YYYYMMDD}.{HHMM+TZ}-{HHMM+TZ}_...xml.gz`
 
-| Component | Before | After | Notes |
-|-----------|--------|-------|-------|
-| Date | `20260731` | `20260916` | Mapped to today |
-| Time Range | `1000+0300-1015+0300` | `1000+0300-1015+0300` | **Unchanged** |
-| Full | `A20260731.1000+0300-1015+0300_...` | `A20260916.1000+0300-1015+0300_...` | Date replaced |
+| Компонент | До | После | Примечания |
+|-----------|-----|-------|------------|
+| Дата | `20260731` | `20260916` | Сопоставляется с сегодня |
+| Диапазон времени | `1000+0300-1015+0300` | `1000+0300-1015+0300` | **Не изменяется** |
+| Полное | `A20260731.1000+0300-1015+0300_...` | `A20260916.1000+0300-1015+0300_...` | Дата заменена |
 
-**Example:**
+**Пример:**
 ```
-Before: A20260731.1000+0300-1015+0300_2912SUVAL41.xml.gz
-After:  A20260916.1000+0300-1015+0300_2912SUVAL41.xml.gz
+До:  A20260731.1000+0300-1015+0300_2912SUVAL41.xml.gz
+После: A20260916.1000+0300-1015+0300_2912SUVAL41.xml.gz
 ```
 
-#### XML Content Conversion
+#### Преобразование содержимого XML
 
-**Before:**
+**До:**
 ```xml
 <measCollec beginTime="2026-07-31T15:45:00+03:00"/>
 </fileHeader>
@@ -502,7 +505,7 @@ After:  A20260916.1000+0300-1015+0300_2912SUVAL41.xml.gz
 </measData>
 ```
 
-**After:**
+**После:**
 ```xml
 <measCollec beginTime="2026-09-16T15:45:00+03:00"/>
 </fileHeader>
@@ -514,126 +517,128 @@ After:  A20260916.1000+0300-1015+0300_2912SUVAL41.xml.gz
 </measData>
 ```
 
-**Conversion Rules:**
-1. **Filename:** Replace only the date portion (`YYYYMMDD`)
-2. **XML `beginTime`/`endTime`:** Replace only the date portion (`YYYY-MM-DD`)
-3. **Time portion:** Preserved exactly (`HH:MM:SS`)
-4. **Timezone:** Preserved exactly (`+03:00`)
+**Правила преобразования:**
+1. **Имя файла:** Заменить только часть даты (`YYYYMMDD`)
+2. **XML `beginTime`/`endTime`:** Заменить только часть даты (`YYYY-MM-DD`)
+3. **Часть времени:** Сохраняется точно (`HH:MM:SS`)
+4. **Часовой пояс:** Сохраняется точно (`+03:00`)
 
-**Format Transformation:**
+**Трансформация формата:**
 ```
-Input:  2026-07-31T15:45:00+03:00
-Output: 2026-09-16T15:45:00+03:00
+Вход:   2026-07-31T15:45:00+03:00
+Выход:  2026-09-16T15:45:00+03:00
         ^^^^^^^^  ^^^^^^^^^^^^^^^
-        date      time+timezone (unchanged)
+        дата      время+часовой пояс (не изменяется)
 ```
 
 ---
 
-### Conversion Summary
+### Сводка преобразований
 
-| Vendor | Filename Date | XML Date Format | Time Preserved |
-|--------|---------------|-----------------|----------------|
-| Nokia | `YYYYMMDD` → `YYYYMMDD` | `YYYYMMDDHHMM+TZ` → `YYYY-MM-DDTHH:MM:SS+TZ:00` | ✅ Yes |
-| Huawei | `YYYYMMDD` → `YYYYMMDD` | `YYYY-MM-DD` → `YYYY-MM-DD` | ✅ Yes |
+| Вендор | Дата в имени | Формат даты в XML | Время сохранено |
+|--------|--------------|-------------------|-----------------|
+| Nokia | `YYYYMMDD` → `YYYYMMDD` | `YYYYMMDDHHMM+TZ` → `YYYY-MM-DDTHH:MM:SS+TZ:00` | ✅ Да |
+| Huawei | `YYYYMMDD` → `YYYYMMDD` | `YYYY-MM-DD` → `YYYY-MM-DD` | ✅ Да |
 
-**Key Points:**
-- ✅ Dates are mapped globally (oldest → today)
-- ✅ Times are preserved exactly
-- ✅ Timezones are preserved exactly
-- ✅ Files with date ≥ today are skipped (Stage 1)
-- ✅ Full datetime checked against current time (Stage 2)
-- ✅ Corrupted files moved to `/home/roundabout2/corrupted/{system}/`
+**Ключевые моменты:**
+- ✅ Даты сопоставляются глобально (самая старая → сегодня)
+- ✅ Времена сохраняются точно
+- ✅ Часовые пояса сохраняются точно
+- ✅ Файлы с датой ≥ сегодня пропускаются (Этап 1)
+- ✅ Полное время проверяется относительно текущего времени (Этап 2)
+- ✅ Повреждённые файлы перемещаются в `/home/roundabout2/corrupted/{system}/`
 
 ---
 
-## 📋 Function Reference
+## 📋 Справочник функций
 
 ### `setup_logging()`
-Sets up file and console logging.
-- Creates log directory if needed
-- Configures file handler (`/home/roundabout2/logs/conversion.log`)
-- Configures console handler
-- Returns logger instance
+Настраивает файловое и консольное журналирование.
+- Создаёт директорию логов при необходимости
+- Настраивает обработчик файла (`/home/roundabout2/logs/conversion.log`)
+- Настраивает обработчик консоли
+- Возвращает экземпляр логгера
 
 ### `load_config()`
-Loads configuration from `config.json`.
-- Returns parsed JSON as dictionary
+Загружает конфигурацию из `config.json`.
+- Возвращает распарсенный JSON в виде словаря
 
 ### `extract_date_from_filename(filename, pattern)`
-Extracts date string from filename using regex pattern.
-- **Parameters:**
-  - `filename` (str): Filename to parse
-  - `pattern` (CompiledRegex): Compiled regex pattern
-- **Returns:** Date string (YYYYMMDD) or None
+Извлекает строку даты из имени файла с помощью regex-шаблона.
+- **Параметры:**
+  - `filename` (str): Имя файла для парсинга
+  - `pattern` (CompiledRegex): Скомпилированный regex-шаблон
+- **Возвращает:** Строка даты (YYYYMMDD) или None
 
 ### `scan_source_files(config, logger)`
-Scans all source directories and extracts dates from filenames.
-- **Parameters:**
-  - `config` (dict): Configuration dictionary
-  - `logger` (Logger): Logger instance
-- **Returns:** Tuple of (vendor_dates, all_dates)
-  - `vendor_dates`: Dict of {system_key: {dates, file_count, oldest_date, newest_date}}
-  - `all_dates`: List of all dates found across all systems
+Сканирует все исходные директории и извлекает даты из имён файлов.
+- **Параметры:**
+  - `config` (dict): Словарь конфигурации
+  - `logger` (Logger): Экземпляр логгера
+- **Возвращает:** Кортеж (vendor_dates, all_dates)
+  - `vendor_dates`: Словарь {system_key: {dates, file_count, oldest_date, newest_date}}
+  - `all_dates`: Список всех дат, найденных по всем системам
 
 ### `stage1_conversion(config, logger)`
-**Stage 1:** One-time initial synchronization.
-- Scans all source directories
-- Finds global oldest date
-- Maps oldest → today, oldest+1 → today+1, etc.
-- Processes only files with dates before today
-- Converts files in-place
-- Moves corrupted files to `/home/roundabout2/corrupted/`
-- Prints "Initial synchronisation done" when complete
+**Этап 1:** Однократная начальная синхронизация.
+- Сканирует все исходные директории
+- Находит глобальную самую старую дату
+- Сопоставляет: самая старая → сегодня, oldest+1 → сегодня+1 и т.д.
+- Обрабатывает только файлы с датами ранее сегодня
+- Преобразует файлы на месте
+- Перемещает повреждённые файлы в `/home/roundabout2/corrupted/`
+- Выводит "Initial synchronisation done" при завершении
 
 ### `convert_mo_files(config, logger, system_key, today, date_range_end, corrupted_dir, max_workers)`
-Converts Nokia MO files (MO4/MO5).
-- **Parameters:**
-  - `config` (dict): Configuration dictionary
-  - `logger` (Logger): Logger instance
-  - `system_key` (str): System key (e.g., "nokia/MO4")
-  - `today` (date): Today's date
-  - `date_range_end` (date): End of date range to process
-  - `corrupted_dir` (str): Directory for corrupted files
-  - `max_workers` (int): Number of parallel workers (default: 4)
-- Uses ThreadPoolExecutor for parallel processing
-- Handles corrupted files automatically
+Преобразует файлы Nokia MO (MO4/MO5).
+- **Параметры:**
+  - `config` (dict): Словарь конфигурации
+  - `logger` (Logger): Экземпляр логгера
+  - `system_key` (str): Ключ системы (например, "nokia/MO4")
+  - `today` (date): Дата сегодня
+  - `date_range_end` (date): Конец диапазона дат для обработки
+  - `corrupted_dir` (str): Директория для повреждённых файлов
+  - `max_workers` (int): Количество параллельных потоков (по умолчанию: 4)
+- Использует ThreadPoolExecutor для параллельной обработки
+- Автоматически обрабатывает повреждённые файлы
 
 ### `convert_hwi_files(config, logger, today, date_range_end, corrupted_dir, max_workers)`
-Converts Huawei HWI files.
-- **Parameters:** Same as `convert_mo_files`
-- Uses ThreadPoolExecutor for parallel processing
-- Handles corrupted files automatically
+Преобразует файлы Huawei HWI.
+- **Параметры:** Те же, что и `convert_mo_files`
+- Использует ThreadPoolExecutor для параллельной обработки
+- Автоматически обрабатывает повреждённые файлы
 
 ### `stage2_run(config, logger)`
-**Stage 2:** Periodic processing.
-- Checks full datetime (date + time) from filename
-- Copies past files to destination directory
-- Modifies originals with date+4
-- **Parameters:**
-  - `config` (dict): Configuration dictionary (must include `stage2` section)
-  - `logger` (Logger): Logger instance
-- Destinations: `{dest_base_dir}/{system}/` (e.g., `/home/roundabout/dest/hwi/`)
+**Этап 2:** Периодическая обработка.
+- Проверяет полное время (дата + время) из имени файла
+- Копирует прошедшие файлы в директорию назначения **с оригинальными именами**
+- Модифицирует оригиналы с датой+4
+- **Периодическая очистка:** Удаляет файлы старше `time_to_cleanup` часов каждые 5000 файлов
+- **Параметры:**
+  - `config` (dict): Словарь конфигурации (должен включать раздел `stage2`)
+  - `logger` (Logger): Экземпляр логгера
+- Пункты назначения: `{dest_base_dir}/{system}/` (например, `/home/roundabout/dest/huawei/`)
 
 ### `main()`
-Main entry point.
-1. Sets up logging
-2. Loads configuration
-3. Runs Stage 1 (one-time)
-4. Enters Stage 2 loop (every N minutes)
-5. Ctrl+C to stop
+Точка входа.
+1. Настраивает журналирование
+2. Загружает конфигурацию
+3. Проверяет `skip_stage1` — если `true`, пропускает Этап 1
+4. Запускает Этап 1 (если не пропущен)
+5. Входит в цикл Этапа 2 (каждые N минут)
+6. Ctrl+C для остановки
 
 ---
 
-## 🛠 Troubleshooting
+## 🛠 Устранение неполадок
 
-### No Files Found
+### Файлы не найдены
 
 ```bash
-# Check source directories
+# Проверка исходных директорий
 ls -la /home/roundabout/source/
 
-# Check file patterns
+# Проверка шаблонов файлов
 python3 -c "
 import re
 pattern = re.compile(r'PM(\d{8})(\d{4}\+\d{4}).*\.xml\.gz')
@@ -642,47 +647,53 @@ print(pattern.match(test))
 "
 ```
 
-### Corrupted Files
+### Повреждённые файлы
 
-Corrupted files are automatically moved to `/home/roundabout2/corrupted/`. Check the log for details:
+Повреждённые файлы автоматически перемещаются в `/home/roundabout2/corrupted/`. Проверьте лог для деталей:
 
 ```bash
 grep "corrupted" /home/roundabout2/logs/conversion.log
 ```
 
-### Permission Errors
+### Ошибки прав доступа
 
 ```bash
-# Fix permissions
+# Исправление прав
 chmod -R 755 /home/roundabout2/
 chown -R root:root /home/roundabout2/
 ```
 
-### Performance Issues
+### Проблемы с производительностью
 
-The script processes ~2500-3000 files/min on HDD. For faster processing:
-- **Move source files to SSD** (10-30x speedup)
-- **Increase workers** (not recommended, diminishing returns)
-- **Use zstd compression** (requires format change)
-
----
-
-## 📝 Version History
-
-| Version | Date | Changes |
-|---------|------|---------|  
-| 1.0.0 | 2026-09-15 | Initial release |
-| 2.0.0 | 2026-09-16 | Added Stage 1 (initial sync) and Stage 2 (periodic processing) |
-| 2.1.0 | 2026-09-16 | Added dest directory cleanup (time_to_cleanup) |
+Скрипт обрабатывает ~2500-3000 файлов/мин на HDD. Для более быстрой обработки:
+- **Переместите исходные файлы на SSD** (ускорение в 10-30 раз)
+- **Увеличьте количество потоков** (не рекомендуется, убывающая отдача)
+- **Используйте сжатие zstd** (требует изменения формата)
 
 ---
 
-## 📄 License
+## 📝 История версий
 
-This project is proprietary software.
+| Версия | Дата | Изменения |
+|--------|------|-----------|
+| 1.0.0 | 2026-09-15 | Начальный релиз |
+| 2.0.0 | 2026-09-16 | Добавлены Этап 1 (начальная синхронизация) и Этап 2 (периодическая обработка) |
+| 2.1.0 | 2026-09-16 | Добавлена очистка директорий dest (time_to_cleanup) |
+| 2.2.0 | 2026-09-18 | Исправлена ошибка datetime.datetime → datetime; добавлена опция skip_stage1 |
+| 2.3.0 | 2026-09-18 | Исправлено копирование в dest — теперь используются оригинальные имена файлов |
+| 2.4.0 | 2026-09-18 | Периодическая очистка во время обработки (каждые 5000 файлов), а не в конце |
+| 2.5.0 | 2026-09-18 | Исправлена замена дат в XML — теперь заменяются ВСЕ даты (beginTime, endTime); добавлено форматирование дат с дефисами (YYYY-MM-DD); добавлено переименование файлов в source |
 
 ---
 
-## 🤝 Support
+## 📄 Лицензия
 
-For issues or questions, please contact the development team.
+Это проприетарное программное обеспечение.
+
+---
+
+## 🤝 Поддержка
+
+По вопросам или проблемам, пожалуйста, обратитесь к команде разработки.
+
+

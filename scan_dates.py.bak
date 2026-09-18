@@ -136,17 +136,18 @@ def _atomic_gzip_write(dest_path, content):
 def _replace_mo_time(match, date_str, target_date_str):
     p, od = match.group(1), match.group(2)
     ot, tz, q = match.group(3), match.group(4), match.group(5)
-    tp = ot[:2] + ":" + ot[2:] + ":00" + tz[:3] + ":" + tz[3:]
-    return f'{p}{target_date_str}-{tp}{q}'
+    if od == date_str:
+        tp = ot[:2] + ":" + ot[2:] + ":00" + tz[:3] + ":" + tz[3:]
+        return f'{p}{target_date_str}-{tp}{q}'
+    return match.group(0)
 
 
 def _replace_hwi_time(match, date_str, target_date_str):
     p, od = match.group(1), match.group(2)
     ot, q = match.group(3), match.group(4)
-    # Format target date with dashes: 20260922 -> 2026-09-22
-    formatted_date = f'{target_date_str[:4]}-{target_date_str[4:6]}-{target_date_str[6:8]}'
-    # Replace ALL dates in XML with target date
-    return f'{p}{formatted_date}{ot}{q}'
+    if od == date_str.replace("-", ""):
+        return f'{p}{target_date_str}{ot}{q}'
+    return match.group(0)
 
 
 def _process_mo_file(sp, nf, ds, tds, tp, cd):
@@ -424,8 +425,8 @@ def _stage2_process_mo_file(sp, nf, tds, tp, dest_dir):
         except UnicodeDecodeError:
             tc = content.decode('latin-1')
 
-        # Copy to dest (unchanged) — use ORIGINAL filename
-        dest_path = os.path.join(dest_dir, fn)
+        # Copy to dest (unchanged)
+        dest_path = os.path.join(dest_dir, nf)
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         with gzip.open(dest_path + '.tmp', 'wb', compresslevel=1) as f_out:
             f_out.write(content)
@@ -437,10 +438,6 @@ def _stage2_process_mo_file(sp, nf, tds, tp, dest_dir):
         with gzip.open(tmp_path, 'wb', compresslevel=1) as f_out:
             f_out.write(nc.encode('utf-8'))
         os.replace(tmp_path, sp)
-
-        # Rename file to new date
-        new_path = sp.replace(fn, nf, 1)
-        os.rename(sp, new_path)
 
         return (True, fn, 'processed')
     except Exception as e:
@@ -461,25 +458,19 @@ def _stage2_process_hwi_file(sp, nf, tds, tp, dest_dir):
         except UnicodeDecodeError:
             tc = content.decode('latin-1')
 
-        # Copy to dest (unchanged) — use ORIGINAL filename
-        dest_path = os.path.join(dest_dir, fn)
+        # Copy to dest (unchanged)
+        dest_path = os.path.join(dest_dir, nf)
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         with gzip.open(dest_path + '.tmp', 'wb', compresslevel=1) as f_out:
             f_out.write(content)
         os.replace(dest_path + '.tmp', dest_path)
 
-        # Extract original date from filename (first 8 chars after A)
-        original_date = fn[1:9]
         # Modify original in source (change date to current date + 4)
-        nc = tp.sub(partial(_replace_hwi_time, date_str=original_date, target_date_str=tds), tc)
+        nc = tp.sub(partial(_replace_hwi_time, date_str=tds[:-8], target_date_str=tds), tc)
         tmp_path = sp + '.tmp'
         with gzip.open(tmp_path, 'wb', compresslevel=1) as f_out:
             f_out.write(nc.encode('utf-8'))
         os.replace(tmp_path, sp)
-
-        # Rename file to new date
-        new_path = sp.replace(fn, nf, 1)
-        os.rename(sp, new_path)
 
         return (True, fn, 'processed')
     except Exception as e:
@@ -493,7 +484,7 @@ def _cleanup_dest_dir(dest_dir, pattern, keep_hours, logger):
     """Clean up destination directory - keep only files from last N hours.
     Files are identified by date in filename.
     """
-    cutoff = datetime.now() - timedelta(hours=keep_hours)
+    cutoff = datetime.datetime.now() - datetime.timedelta(hours=keep_hours)
     to_delete = []
 
     if not os.path.exists(dest_dir):
@@ -530,10 +521,10 @@ def stage2_run(config, logger):
     keep_hours = stage2_cfg.get("time_to_cleanup", 2)  # Hours to keep files
 
     logger.info("=" * 60)
-    logger.info(f"STAGE 2 RUN - {datetime.now()}")
+    logger.info(f"STAGE 2 RUN - {datetime.datetime.now()}")
     logger.info("=" * 60)
 
-    today = datetime.now()
+    today = datetime.datetime.now()
     target_date = (today + timedelta(days=date_offset)).strftime("%Y%m%d")
     target_date_iso = (today + timedelta(days=date_offset)).strftime("%Y-%m-%d")
 
@@ -547,7 +538,7 @@ def stage2_run(config, logger):
                     "system": sn,
                     "source_dir": sc["source_dir"],
                     "pattern": re.compile(vc["file_pattern"]),
-                    "system_type": f"{vn}/{sn}"
+                    "system_type": "nokia"
                 })
         else:
             systems.append({
@@ -620,11 +611,6 @@ def stage2_run(config, logger):
                 completed += 1
                 if completed % 500 == 0:
                     logger.info(f"  {sname} Progress: {completed}/{len(files_to_process)}")
-                # Periodic cleanup during processing
-                if completed % 5000 == 0:
-                    cleaned = _cleanup_dest_dir(dest_dir, sys_info["pattern"], keep_hours, logger)
-                    if cleaned > 0:
-                        logger.info(f"  Periodic cleanup: removed {cleaned} old files")
 
         total_processed += stats["processed"]
         total_errors += stats["errors"] + stats["corrupted"]
@@ -652,10 +638,7 @@ def main():
     config = load_config()
 
     # Stage 1: Run once at startup
-    if config.get("skip_stage1", False):
-        logger.info("Stage 1 skipped (skip_stage1=true)")
-    else:
-        stage1_conversion(config, logger)
+    stage1_conversion(config, logger)
 
     # Stage 2: Run periodically
     stage2_cfg = config.get("stage2", {})
@@ -679,20 +662,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
