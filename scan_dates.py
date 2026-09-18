@@ -652,7 +652,10 @@ def stage2_run(config, logger):
     for sys_info in systems:
         sname = f"{sys_info['vendor']}/{sys_info['system']}"
         sd = sys_info['source_dir']
-        logger.info(f"  {sname}: start={system_start_times[sname]['start'].strftime('%Y-%m-%d %H:%M:%S')}, end={system_start_times[sname]['end'].strftime('%Y-%m-%d %H:%M:%S')}, files={system_start_times[sname]['files']}")
+        info = system_start_times.get(sname, {"start": None, "end": None, "files": 0})
+        start_str = info['start'].strftime('%Y-%m-%d %H:%M:%S') if info['start'] else 'N/A'
+        end_str = info['end'].strftime('%Y-%m-%d %H:%M:%S') if info['end'] else 'N/A'
+        logger.info(f"  {sname}: start={start_str}, end={end_str}, files={info['files']}")
     
     # Log dest folder status
     logger.info("=" * 60)
@@ -700,6 +703,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
