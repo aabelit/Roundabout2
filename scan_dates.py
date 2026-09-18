@@ -583,7 +583,12 @@ def stage2_run(config, logger):
                 if not fn.endswith(".gz"):
                     continue
                 dt = extract_datetime_from_filename(fn, stype, sys_info["pattern"])
-                # Track oldest/newest file dates in this Stage 2 run
+                if dt is None:
+                    continue
+                if dt >= today:
+                    continue  # Not in the past yet
+
+                # Track oldest/newest file dates (only for files being processed)
                 if stage2_oldest_date is None or dt.date() < stage2_oldest_date:
                     stage2_oldest_date = dt.date()
                 if stage2_newest_date is None or dt.date() > stage2_newest_date:
@@ -592,10 +597,6 @@ def stage2_run(config, logger):
                     system_start_times[sname]["oldest"] = dt.date()
                 if system_start_times[sname]["newest"] is None or dt.date() > system_start_times[sname]["newest"]:
                     system_start_times[sname]["newest"] = dt.date()
-                if dt is None:
-                    continue
-                if dt >= today:
-                    continue  # Not in the past yet
 
                 # Extract date from filename for replacement
                 ds = sys_info["pattern"].match(fn).group(1)
