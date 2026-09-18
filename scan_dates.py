@@ -532,8 +532,9 @@ def stage2_run(config, logger):
     logger.info("=" * 60)
     logger.info(f"STAGE 2 RUN - {datetime.now()}")
     logger.info("=" * 60)
-    stage2_start_time = datetime.now()
     system_start_times = {}
+    stage2_oldest_date = None
+    stage2_newest_date = None
 
     today = datetime.now()
     target_date = (today + timedelta(days=date_offset)).strftime("%Y%m%d")
@@ -572,7 +573,7 @@ def stage2_run(config, logger):
 
         logger.info(f"\nProcessing {sname}...")
         logger.info(f"  Source: {sd}")
-        system_start_times[sname] = {"start": datetime.now(), "end": None, "files": 0}
+        system_start_times[sname] = {"oldest": None, "newest": None, "files": 0}
         logger.info(f"  Dest: {dest_dir}")
         logger.info(f"  Target date: {target_date}")
 
@@ -582,6 +583,15 @@ def stage2_run(config, logger):
                 if not fn.endswith(".gz"):
                     continue
                 dt = extract_datetime_from_filename(fn, stype, sys_info["pattern"])
+                # Track oldest/newest file dates in this Stage 2 run
+                if stage2_oldest_date is None or dt.date() < stage2_oldest_date:
+                    stage2_oldest_date = dt.date()
+                if stage2_newest_date is None or dt.date() > stage2_newest_date:
+                    stage2_newest_date = dt.date()
+                if system_start_times[sname]["oldest"] is None or dt.date() < system_start_times[sname]["oldest"]:
+                    system_start_times[sname]["oldest"] = dt.date()
+                if system_start_times[sname]["newest"] is None or dt.date() > system_start_times[sname]["newest"]:
+                    system_start_times[sname]["newest"] = dt.date()
                 if dt is None:
                     continue
                 if dt >= today:
@@ -633,8 +643,6 @@ def stage2_run(config, logger):
         total_errors += stats["errors"] + stats["corrupted"]
         logger.info(f"  {sname} Complete: {stats['processed']} processed, "
                     f"{stats['errors']} errors, {stats['corrupted']} corrupted")
-        system_start_times[sname]["end"] = datetime.now()
-        system_start_times[sname]["files"] = len(files_to_process)
 
     # Cleanup: remove files older than keep_hours from dest directories
     logger.info(f"\nCleaning up dest directories (keeping last {keep_hours} hours)...")
@@ -649,14 +657,14 @@ def stage2_run(config, logger):
 
     logger.info("=" * 60)
     logger.info(f"STAGE 2 RUN COMPLETE - {total_processed} processed, {total_errors} errors, {total_cleaned} cleaned")
-    logger.info(f"Stage 2 run: start={stage2_start_time.strftime('%Y-%m-%d %H:%M:%S')}, end={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Stage 2 run: oldest_file={stage2_oldest_date.strftime('%Y-%m-%d %H:%M') if stage2_oldest_date else 'N/A'}, newest_file={stage2_newest_date.strftime('%Y-%m-%d %H:%M') if stage2_newest_date else 'N/A'}")
     for sys_info in systems:
         sname = f"{sys_info['vendor']}/{sys_info['system']}"
         sd = sys_info['source_dir']
-        info = system_start_times.get(sname, {"start": None, "end": None, "files": 0})
-        start_str = info['start'].strftime('%Y-%m-%d %H:%M:%S') if info['start'] else 'N/A'
-        end_str = info['end'].strftime('%Y-%m-%d %H:%M:%S') if info['end'] else 'N/A'
-        logger.info(f"  {sname}: start={start_str}, end={end_str}, files={info['files']}")
+        info = system_start_times.get(sname, {"oldest": None, "newest": None, "files": 0})
+        oldest_str = info['oldest'].strftime('%Y-%m-%d %H:%M') if info['oldest'] else 'N/A'
+        newest_str = info['newest'].strftime('%Y-%m-%d %H:%M') if info['newest'] else 'N/A'
+        logger.info(f"  {sname}: oldest={oldest_str}, newest={newest_str}, files={info['files']}")
     
     # Log dest folder status
     logger.info("=" * 60)
