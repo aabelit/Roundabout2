@@ -572,6 +572,7 @@ def stage2_run(config, logger):
 
         logger.info(f"\nProcessing {sname}...")
         logger.info(f"  Source: {sd}")
+        system_start_times[sname] = {"start": datetime.now(), "end": None, "files": 0}
         logger.info(f"  Dest: {dest_dir}")
         logger.info(f"  Target date: {target_date}")
 
