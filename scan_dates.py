@@ -643,6 +643,7 @@ def stage2_run(config, logger):
         total_errors += stats["errors"] + stats["corrupted"]
         logger.info(f"  {sname} Complete: {stats['processed']} processed, "
                     f"{stats['errors']} errors, {stats['corrupted']} corrupted")
+        system_start_times[sname]["files"] = len(files_to_process)
 
     # Cleanup: remove files older than keep_hours from dest directories
     logger.info(f"\nCleaning up dest directories (keeping last {keep_hours} hours)...")
