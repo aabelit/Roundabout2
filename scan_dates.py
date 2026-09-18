@@ -532,6 +532,8 @@ def stage2_run(config, logger):
     logger.info("=" * 60)
     logger.info(f"STAGE 2 RUN - {datetime.now()}")
     logger.info("=" * 60)
+    stage2_start_time = datetime.now()
+    system_start_times = {}
 
     today = datetime.now()
     target_date = (today + timedelta(days=date_offset)).strftime("%Y%m%d")
@@ -630,6 +632,8 @@ def stage2_run(config, logger):
         total_errors += stats["errors"] + stats["corrupted"]
         logger.info(f"  {sname} Complete: {stats['processed']} processed, "
                     f"{stats['errors']} errors, {stats['corrupted']} corrupted")
+        system_start_times[sname]["end"] = datetime.now()
+        system_start_times[sname]["files"] = len(files_to_process)
 
     # Cleanup: remove files older than keep_hours from dest directories
     logger.info(f"\nCleaning up dest directories (keeping last {keep_hours} hours)...")
@@ -644,6 +648,11 @@ def stage2_run(config, logger):
 
     logger.info("=" * 60)
     logger.info(f"STAGE 2 RUN COMPLETE - {total_processed} processed, {total_errors} errors, {total_cleaned} cleaned")
+    logger.info(f"Stage 2 run: start={stage2_start_time.strftime('%Y-%m-%d %H:%M:%S')}, end={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    for sys_info in systems:
+        sname = f"{sys_info['vendor']}/{sys_info['system']}"
+        sd = sys_info['source_dir']
+        logger.info(f"  {sname}: start={system_start_times[sname]['start'].strftime('%Y-%m-%d %H:%M:%S')}, end={system_start_times[sname]['end'].strftime('%Y-%m-%d %H:%M:%S')}, files={system_start_times[sname]['files']}")
     logger.info("=" * 60)
 
 
@@ -679,6 +688,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
