@@ -658,7 +658,11 @@ def stage2_run(config, logger):
         total_errors += stats["errors"] + stats["corrupted"]
         logger.info(f"  {sname} Complete: {stats['processed']} processed, "
                     f"{stats['errors']} errors, {stats['corrupted']} corrupted")
-        system_start_times[sname]["files"] = len(files_to_process)
+        # Count total files in source directory
+        total_files = 0
+        for r, d, fs in os.walk(sd):
+            total_files += len([f for f in fs if f.endswith(".gz")])
+        system_start_times[sname]["files"] = total_files
 
     # Cleanup: remove files older than keep_hours from dest directories
     logger.info(f"\nCleaning up dest directories (keeping last {keep_hours} hours)...")
