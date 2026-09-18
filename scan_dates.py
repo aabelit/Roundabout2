@@ -588,14 +588,6 @@ def stage2_run(config, logger):
                 if dt >= today:
                     continue  # Not in the past yet
 
-                # Track oldest/newest file dates (only for files being processed)
-                if stage2_oldest_date is None or dt < stage2_oldest_date:
-                    stage2_oldest_date = dt
-                if stage2_newest_date is None or dt > stage2_newest_date:
-                    stage2_newest_date = dt
-                if system_start_times[sname]["oldest"] is None or dt < system_start_times[sname]["oldest"]:
-                    system_start_times[sname]["oldest"] = dt
-                if system_start_times[sname]["newest"] is None or dt > system_start_times[sname]["newest"]:
                     system_start_times[sname]["newest"] = dt
 
                 # Extract date from filename for replacement
@@ -607,6 +599,28 @@ def stage2_run(config, logger):
                 files_to_process.append((sp, nf, target_date, stype))
 
         logger.info(f"  Found {len(files_to_process)} files to process")
+
+        # Track oldest/newest from ALL files in source after processing
+        all_oldest = None
+        all_newest = None
+        for root2, dirs2, files2 in os.walk(sd):
+            for fn2 in files2:
+                if not fn2.endswith(".gz"):
+                    continue
+                dt2 = extract_datetime_from_filename(fn2, stype, sys_info["pattern"])
+                if dt2 is None:
+                    continue
+                if all_oldest is None or dt2 < all_oldest:
+                    all_oldest = dt2
+                if all_newest is None or dt2 > all_newest:
+                    all_newest = dt2
+
+        if all_oldest:
+            stage2_oldest_date = all_oldest
+        if all_newest:
+            stage2_newest_date = all_newest
+        system_start_times[sname]["oldest"] = all_oldest
+        system_start_times[sname]["newest"] = all_newest
 
         stats = {"processed": 0, "errors": 0, "corrupted": 0}
         stats_lock = Lock()
