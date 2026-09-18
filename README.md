@@ -100,7 +100,8 @@ cd /home/roundabout2
         "dest_base_dir": "/home/roundabout/dest",
         "date_offset_days": 4,
         "time_to_cleanup": 2
-    }
+    },
+    "skip_stage1": false
 }
 ```
 
@@ -695,5 +696,6 @@ chown -R root:root /home/roundabout2/
 ## 🤝 Поддержка
 
 По вопросам или проблемам, пожалуйста, обратитесь к команде разработки.
+
 
 
