@@ -653,6 +653,18 @@ def stage2_run(config, logger):
         sname = f"{sys_info['vendor']}/{sys_info['system']}"
         sd = sys_info['source_dir']
         logger.info(f"  {sname}: start={system_start_times[sname]['start'].strftime('%Y-%m-%d %H:%M:%S')}, end={system_start_times[sname]['end'].strftime('%Y-%m-%d %H:%M:%S')}, files={system_start_times[sname]['files']}")
+    
+    # Log dest folder status
+    logger.info("=" * 60)
+    logger.info("DEST FOLDER STATUS")
+    logger.info("=" * 60)
+    for v in ["huawei", "nokia"]:
+        dest = f"/home/roundabout/dest/{v}"
+        if os.path.exists(dest):
+            total = 0
+            for root, dirs, files in os.walk(dest):
+                total += len([f for f in files if f.endswith(".gz")])
+            logger.info(f"  {v}: {total} files")
     logger.info("=" * 60)
 
 
@@ -688,6 +700,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
